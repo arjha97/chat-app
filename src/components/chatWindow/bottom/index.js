@@ -6,6 +6,7 @@ import firebase from 'firebase/app';
 import { useProfile } from '../../../context/profile.context';
 
 import { database } from '../../../misc/firebase';
+import AttachmentBtnModal from './AttachmentBtnModal';
 
 function assembleMessage(profile, chatId){
   return {
@@ -73,9 +74,43 @@ const Bottom = () => {
     }
   }
 
+  const afterUpload = useCallback(async (files) => {
+    setIsLoading(true);
+
+    const updates = {};
+
+    files.forEach(file => {
+      const messageData = assembleMessage(profile, chatId);
+      messageData.file = file;
+
+      const messageId = database.ref('messages').push().key;
+
+      updates[`/messages/${messageId}`] = messageData;
+    })
+
+    const lastMsgId = Object.keys(updates).pop();
+    updates[`/rooms/${chatId}/lastMessage`] = {
+      ...updates[lastMsgId],
+      messageData: lastMsgId
+    };
+
+    try {
+      await database.ref().update(updates);
+     
+      setIsLoading(false);
+ 
+      Alert.info('Message has been sent', 3000);
+     
+    } catch (err) {
+      setIsLoading(false);
+      Alert.error(err.message, 3000)
+    }
+  }, [chatId, profile])
+
     return (
         <div>
           <InputGroup>
+           <AttachmentBtnModal afterUpload={afterUpload}/>
            <Input placeholder="Write a new msg here..." value={input} onChange={onInputChange} onKeyDown={onKeyDown} />
 
            <InputGroup.Button color="blue" appearance="primary" onClick={onSendClick} disabled={isLoading}>
